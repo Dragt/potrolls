@@ -320,7 +320,7 @@ function chargerEvenementsTroll(matricule) {
         let nodePageEvenements = document.createElement("div");
         nodePageEvenements.innerHTML = pageHtMLEvenements;
         //let evenementsTroll = [];
-        let trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr');
+        let trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr, table#events tbody tr'); // todo : trouver un truc sûr pour recupérer tr
         if (trEvenements.length == 0) {alert("Il faut être connecté à MountyHall et le matricule doit être correct"); return;}
         for (let tr of trEvenements) {
             let tableauTd = tr.querySelectorAll('td');
