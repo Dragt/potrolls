@@ -241,7 +241,8 @@ function supprimerTousLesTrolls () {
         delete trolls[matricule];
     }
     afficherTrolls();
-    afficherEvenements();
+    afficherEvenements();    
+    mettreAJourSauvegarde();
 }
 
 /* ************* partie affichage evenements **************** */
