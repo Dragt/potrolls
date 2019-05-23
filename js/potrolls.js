@@ -416,7 +416,7 @@ function reparerLiens() {
 
             a.href = "https://games.mountyhall.com/mountyhall/View/PJView_Events.php?ai_IDPJ=" + matricule;
         }
-        else if (a.href.includes('/mountyhall/View/PJView.php?ai_IDPJ=') || (!(a.href.includes('https://games.mountyhall.com')))) { // troll
+        else if (a.href.includes('/mountyhall/View/PJView.php?ai_IDPJ=') && (!(a.href.includes('https://games.mountyhall.com')))) { // troll
             a.target = "_blank";
             matricule = a.href.split("=")[1];
             a.href = "https://games.mountyhall.com/mountyhall/View/PJView_Events.php?ai_IDPJ=" + matricule;
@@ -431,7 +431,7 @@ function reparerLiens() {
             matricule = a.href.split("'")[1];
             a.href = "https://games.mountyhall.com/mountyhall/View/MonsterView.php?ai_IDPJ=" + matricule;
         }
-        else if (a.href.includes('/mountyhall/View/MonsterView?ai_IDPJ=') || (!(a.href.includes('https://games.mountyhall.com')))) { // troll
+        else if (a.href.includes('/mountyhall/View/MonsterView?ai_IDPJ=') && (!(a.href.includes('https://games.mountyhall.com')))) { // troll
             a.target = "_blank";
             matricule = a.href.split("=")[1];
            a.href = "https://games.mountyhall.com/mountyhall/View/MonsterView.php?ai_IDPJ=" + matricule;
