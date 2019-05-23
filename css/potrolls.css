@@ -1,0 +1,19 @@
+
+.partie {
+    margin: 2vmin;
+}
+
+#trolls td, #trolls th {
+    text-align: center;
+}
+.mh_monstres {
+    color: red;
+}
+
+.mh_trolls_1 {
+    color: blue;
+}
+
+.ensemble {
+    white-space: nowrap;
+}

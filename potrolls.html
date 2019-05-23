@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Potrolls</title>
+  <link rel="stylesheet" href="css/potrolls.css">
+  <script type='text/javascript' src="js/potrolls.js"></script>
+</head>
+<body>
+
+<div id="interface" class="partie">
+  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable. Il faut
+    être connecté à MH.</strong></p></div>
+  <div>
+    <span class="ensemble">
+      <label for="nouveauTroll">Ajouter un troll (matricule) :</label>
+      <input id="nouveauTroll" type="number" min="0" max="999999" step="1" >
+      <button id="ajouterTroll">Ajouter</button>
+    </span>
+  </div>
+</div>
+
+<div id="trolls" class="partie">
+  <table>
+    <thead>
+    <tr>
+      <th>Matricule</th>
+      <th>Couleur</th>
+      <th>Màj</th>
+      <th>
+        <button id="boutonRafraichirTous">Tous(!)</button>
+      </th>
+      <th>Nombre</th>
+      <th>Combat</th>
+      <th>Cacher</th>
+      <th>
+        <button id="boutonSupprimerTous">Tous(!)</button>
+      </th>
+    </tr>
+    </thead>
+
+    <tbody id="listeTrolls">
+    </tbody>
+
+  </table>
+</div>
+
+<div id="evenements" class="partie">
+  <strong>Evenements des trolls</strong>
+  <div id="listeEvenements">
+  </div>
+</div>
+
+
+</body>
+</html>
