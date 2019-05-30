@@ -14,27 +14,32 @@ const ID_TROLL = 'troll-';
 const CLASS_EVENEMENT = 'evenement-';
 const CLASS_TROLL = 'etroll-';
 const ID_COULEUR = 'couleur-';
+const ID_NOM = 'nom-';
 const ID_COMBAT = 'combat-';
 const ID_CACHER = 'cacher-';
 const ID_SUPPRIMER = 'supprimer-';
 const ID_RAFRAICHIR = 'rafraichir-';
 
+const SELECTEUR_ZONE_A_REMPLIR = '.mh_tdtitre';
+//const SELECTEUR_ZONE_A_REMPLIR = '#zoneARemplir';
+
 
 let trolls = {};
 /* redondance valeur matricule par simplicité
-{ matricule: {
-    couleur:,
-    inputCouleur: ,
-    tdNombreEvenements: ,
-    heureMaj;
-    tdHeureMaj: ,
-    combat: ,
-    checkBoxCombat: ,
-    cacher: ,
-    checkBoxCacher: ,
-    evenements : [{matricule: , moment: , type: , cacher:, tr:  }, ...]
-}}
-*/
+ { matricule: {
+ nom:
+ couleur:,
+ inputCouleur: ,
+ tdNombreEvenements: ,
+ heureMaj;
+ tdHeureMaj: ,
+ combat: ,
+ checkBoxCombat: ,
+ cacher: ,
+ checkBoxCacher: ,
+ evenements : [{matricule: , moment: , type: , cacher:, tr:  }, ...]
+ }}
+ */
 
 let trollsSauvegardes = [];
 /* [ {matricule: , couleur: }, ...] */
@@ -46,6 +51,9 @@ let trollsSauvegardes = [];
 document.addEventListener('DOMContentLoaded', initialiserPage);
 
 function initialiserPage() {
+
+    ajouterStructure();
+    mettreEnFormeStructure();
 
     recupererSauvegarde();
 
@@ -63,6 +71,7 @@ function recupererSauvegarde() {
 
         for (let troll of trollsSauvegardes) {
             trolls[troll.matricule] = {};
+            trolls[troll.matricule].nom = troll.nom;
             trolls[troll.matricule].couleur = troll.couleur;
             trolls[troll.matricule].heureMaj = '';
             trolls[troll.matricule].nombreEvenements = 0;
@@ -73,12 +82,14 @@ function recupererSauvegarde() {
         colorier();
     }
 }
+
 function mettreAJourSauvegarde() {
     trollsSauvegardes = [];
 
     for (let matricule in trolls) {
         let trollSauvegarde = {};
         trollSauvegarde.matricule = matricule;
+        trollSauvegarde.nom =trolls[matricule].nom;
         trollSauvegarde.couleur = trolls[matricule].couleur;
         trollsSauvegardes.push(trollSauvegarde);
     }
@@ -91,7 +102,7 @@ function mettreAJourSauvegarde() {
 
 
 function ajouterTroll() {
-    let matricule = document.getElementById('nouveauTroll').value;
+    const matricule = document.getElementById('nouveauTroll').value;
 
     if (Object.keys(trolls).length >= MAX_TROLLS) {alert('Maximum ' + MAX_TROLLS + ' trolls.'); return;} // limite pour le moment pour éviter les abus ?
 
@@ -108,18 +119,19 @@ function ajouterTroll() {
     afficherTrolls();
     chargerEvenementsTroll(matricule);
 
-    mettreAJourSauvegarde();
+    // mettreAJourSauvegarde(); // bien ici, plutôt mis apprès pour faire tout en une fois avec nom du troll connu
 }
 
+
 function donnerCouleurSuivante() {
-    let couleur = COULEURS[couleurSuivante];
+    const couleur = COULEURS[couleurSuivante];
     couleurSuivante = (couleurSuivante + 1 ) % COULEURS.length;
     return couleur;
 }
 
 function afficherTrolls() {
 
-    let indexTrolls = Object.keys(trolls).sort((x, y) => x - y); // tri sur le matricule
+    const indexTrolls = Object.keys(trolls).sort((x, y) => x - y); // tri sur le matricule
 
     let listeTrollsDocumentFragment = document.createDocumentFragment();
     for (let matricule of indexTrolls) {
@@ -129,107 +141,120 @@ function afficherTrolls() {
 
     document.getElementById('listeTrolls').innerHTML = '';
     document.getElementById('listeTrolls').appendChild(listeTrollsDocumentFragment);
-
 }
 
 
 function creerTrTroll(matricule) {
 
     // J'ai une fonction générique pour créer des évènements par paramètres... mais ça s'exécute un chouia moins vite. :)
-    let trTroll = document.createElement("tr");
+    const trTroll = document.createElement("tr");
     trTroll.setAttribute('id', ID_TROLL + matricule);
+    trTroll.style.textAlign = 'center'; // css
 
-    let tdMatricule = document.createElement("td");
+    const tdMatricule = document.createElement("td");
     tdMatricule.appendChild(document.createTextNode(matricule));
+    tdMatricule.style.textAlign = 'center'; // css
     trTroll.appendChild(tdMatricule);
 
-    let tdCouleur = document.createElement("td");
-    let inputCouleur = document.createElement("input");
+    const tdNom = document.createElement("td");
+    tdNom.setAttribute('id', ID_NOM + matricule);
+    if (trolls[matricule].nom) tdNom.appendChild(document.createTextNode(trolls[matricule].nom));
+    tdNom.style.textAlign = 'center'; // css
+    trTroll.appendChild(tdNom);
+
+    const tdCouleur = document.createElement("td");
+    const inputCouleur = document.createElement("input");
     inputCouleur.setAttribute('id', ID_COULEUR + matricule);
     inputCouleur.setAttribute('type', 'color');
     inputCouleur.setAttribute('value', trolls[matricule].couleur);
     inputCouleur.addEventListener('change', changerCouleurTroll);
     tdCouleur.appendChild(inputCouleur);
+    tdCouleur.style.textAlign = 'center'; // css
     trTroll.appendChild(tdCouleur);
     trolls[matricule].inputCouleur = inputCouleur; // pour accéder directement à sa valeur pou l'enregistrer
 
-    let tdMaj = document.createElement("td");
+    const tdMaj = document.createElement("td");
     tdMaj.appendChild(document.createTextNode(trolls[matricule].heureMaj));
+    tdMaj.style.textAlign = 'center'; // css
     trTroll.appendChild(tdMaj);
     trolls[matricule].tdHeureMaj = tdMaj; // pour y accéder directement pour mettre à jour
 
-    let tdRafraichir = document.createElement("td");
-    let boutonRafraichir = document.createElement("button");
+    const tdRafraichir = document.createElement("td");
+    const boutonRafraichir = document.createElement("button");
     boutonRafraichir.appendChild(document.createTextNode('Rafraichir'));
     boutonRafraichir.setAttribute('id', ID_RAFRAICHIR + matricule);
     boutonRafraichir.addEventListener('click', rafraichirTroll);
     tdRafraichir.appendChild(boutonRafraichir);
+    tdRafraichir.style.textAlign = 'center'; // css
     trTroll.appendChild(tdRafraichir);
 
-    let tdNombre = document.createElement("td");
+    const tdNombre = document.createElement("td");
     tdNombre.appendChild(document.createTextNode(trolls[matricule].nombreEvenements));
     trTroll.appendChild(tdNombre);
     trolls[matricule].tdNombreEvenements = tdNombre; // pour y accéder directement pour mettre à jour
 
-    let tdCombat = document.createElement("td");
-    let checkBoxCombat = document.createElement("input");
+    const tdCombat = document.createElement("td");
+    const checkBoxCombat = document.createElement("input");
     checkBoxCombat.setAttribute('id', ID_COMBAT + matricule);
     checkBoxCombat.setAttribute('type', 'checkbox');
     checkBoxCombat.addEventListener('change', afficherSeulementCombatTroll);
     tdCombat.appendChild(checkBoxCombat);
+    tdCombat.style.textAlign = 'center'; // css
     trTroll.appendChild(tdCombat);
     trolls[matricule].checkBoxCombat = checkBoxCombat;
     checkBoxCombat.checked = Boolean(trolls[matricule].combat);
 
-    let tdCacher = document.createElement("td");
-    let checkBoxCacher = document.createElement("input");
+    const tdCacher = document.createElement("td");
+    const checkBoxCacher = document.createElement("input");
     checkBoxCacher.setAttribute('id', ID_CACHER + matricule);
     checkBoxCacher.setAttribute('type', 'checkbox');
     checkBoxCacher.addEventListener('change', cacherEvenementsTroll);
     tdCacher.appendChild(checkBoxCacher);
+    tdCacher.style.textAlign = 'center'; // css
     trTroll.appendChild(tdCacher);
     trolls[matricule].checkBoxCacher = checkBoxCacher;
     checkBoxCacher.checked = Boolean(trolls[matricule].cacher);
 
-    let tdSupprimer = document.createElement("td");
-    let boutonSupprimer = document.createElement("button");
+    const tdSupprimer = document.createElement("td");
+    const boutonSupprimer = document.createElement("button");
     boutonSupprimer.setAttribute('id', ID_SUPPRIMER + matricule);
     boutonSupprimer.appendChild(document.createTextNode('Supprimer'));
     boutonSupprimer.addEventListener('click', supprimerTroll);
     tdSupprimer.appendChild(boutonSupprimer);
+    tdSupprimer.style.textAlign = 'center'; // css
     trTroll.appendChild(tdSupprimer);
 
     return trTroll;
 }
 
 function rafraichirTroll() {
-    let matricule = this.id.replace(ID_RAFRAICHIR, '');
+    const matricule = this.id.replace(ID_RAFRAICHIR, '');
     chargerEvenementsTroll(matricule);
 }
 
 function changerCouleurTroll() {
-    let matricule = this.id.replace(ID_COULEUR, '');
+    const matricule = this.id.replace(ID_COULEUR, '');
     trolls[matricule].couleur = this.value;
     afficherEvenements();
     mettreAJourSauvegarde();
 }
 
 function afficherSeulementCombatTroll() {
-    let matricule = this.id.replace(ID_COMBAT, '');
+    const matricule = this.id.replace(ID_COMBAT, '');
     trolls[matricule].combat = Number(trolls[matricule].checkBoxCombat.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
 }
 
 function cacherEvenementsTroll() {
-    let matricule = this.id.replace(ID_CACHER, '');
+    const matricule = this.id.replace(ID_CACHER, '');
     trolls[matricule].cacher = Number(trolls[matricule].checkBoxCacher.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
 }
 
 function supprimerTroll() {
-    let matricule = this.id.replace(ID_SUPPRIMER, '');
+    const matricule = this.id.replace(ID_SUPPRIMER, '');
     delete trolls[matricule];
     afficherTrolls();
     afficherEvenements();
@@ -241,7 +266,7 @@ function supprimerTousLesTrolls () {
         delete trolls[matricule];
     }
     afficherTrolls();
-    afficherEvenements();    
+    afficherEvenements();
     mettreAJourSauvegarde();
 }
 
@@ -255,11 +280,11 @@ function rafraichirEvenementsDeTousLesTrolls() {
 
 function afficherEvenements() {
 
-    let tousEvements = recupererTousEvenements();
+    const tousEvements = recupererTousEvenements();
 
     tousEvements.sort((x, y) => y.moment.getTime() - x.moment.getTime() ); // tri sur le moment de l'évènement
 
-    let tableEvenements = document.createElement("table");
+    const tableEvenements = document.createElement("table");
     for (let e of tousEvements)
     {
         tableEvenements.appendChild(e.tr);
@@ -269,6 +294,9 @@ function afficherEvenements() {
 
     colorier();
     reparerLiens();
+    mettreCouleursEvenements();
+
+    mettreAJourSauvegarde(); // un peu dommage fait à chaque fois ?
 }
 
 function recupererTousEvenements() {
@@ -280,11 +308,10 @@ function recupererTousEvenements() {
                 evenementsFiltres = evenementsFiltres.filter(x => x.type === 'COMBAT');
             }
             tousEvenements = tousEvenements.concat(evenementsFiltres);
-         }
+        }
     }
     return tousEvenements;
 }
-
 
 
 function chargerEvenementsTroll(matricule) {
@@ -292,16 +319,16 @@ function chargerEvenementsTroll(matricule) {
     appelerEvenements(matricule);
 
     function appelerEvenements(matricule) {
-        let xhr = new XMLHttpRequest();
-        let url = `${serveur}${service}?${numTroll}=${matricule}&${numPage}=1`;
+        const xhr = new XMLHttpRequest();
+        const url = `${serveur}${service}?${numTroll}=${matricule}&${numPage}=1`;
         xhr.open('get', url, true);
         xhr.onload = callBackAppelerEvenements.bind(xhr, matricule);
         xhr.send();
     }
 
     function callBackAppelerEvenements(matricule) {
-        let heureRetour = new Date();
-        let reponseHtml = this.responseText;
+        const heureRetour = new Date();
+        const reponseHtml = this.responseText;
 
         supprimerEvenements(matricule);
         ajouterEvenements(reponseHtml, matricule);
@@ -311,16 +338,21 @@ function chargerEvenementsTroll(matricule) {
     }
 
     function ajouterEvenements(pageHtMLEvenements, matricule) {
-        let evenementsTroll = convertirVersEvenements(pageHtMLEvenements, matricule)
+        const evenementsTroll = convertirVersEvenements(pageHtMLEvenements, matricule)
         trolls[matricule].evenements = trolls[matricule].evenements.concat(evenementsTroll);
     }
 
     function convertirVersEvenements(pageHtMLEvenements, matricule) {
-        let evenementsTroll = []
-        let nodePageEvenements = document.createElement("div");
+        const evenementsTroll = []
+        const nodePageEvenements = document.createElement("div");
         nodePageEvenements.innerHTML = pageHtMLEvenements;
         //let evenementsTroll = [];
-        let trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr, table#events tbody tr'); // todo : trouver un truc sûr pour recupérer tr
+
+        // Afficher le nom du troll
+        trolls[matricule].nom = nodePageEvenements.querySelector('.mh_titre1').innerHTML;
+        document.getElementById(ID_NOM + matricule).innerHTML = trolls[matricule].nom;
+
+        const trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr, table#events tbody tr'); // todo : trouver un truc sûr pour recupérer tr
         if (trEvenements.length == 0) {alert("Il faut être connecté à MountyHall et le matricule doit être correct"); return;}
         for (let tr of trEvenements) {
             let tableauTd = tr.querySelectorAll('td');
@@ -332,13 +364,13 @@ function chargerEvenementsTroll(matricule) {
             tr.classList.add(CLASS_EVENEMENT + matricule);
 
 
-            let boutonSupprimerEvenement = document.createElement("button");
+            const boutonSupprimerEvenement = document.createElement("button");
             boutonSupprimerEvenement.setAttribute('data-matricule', matricule); // +id evenement ?
             boutonSupprimerEvenement.setAttribute('title', 'Supprime cette ligne d\'évènement');
             boutonSupprimerEvenement.appendChild(document.createTextNode('X'));
             boutonSupprimerEvenement.addEventListener('click', supprimerEvenement);
 
-            let tdSupprimerEvenement = document.createElement("td");
+            const tdSupprimerEvenement = document.createElement("td");
             tdSupprimerEvenement.appendChild(boutonSupprimerEvenement);
             tr.insertBefore(tdSupprimerEvenement, tr.firstChild);
             //tr.insertAdjacentHTML('afterbegin', ),;
@@ -353,10 +385,10 @@ function chargerEvenementsTroll(matricule) {
 }
 
 function supprimerEvenement() {
-    let matricule = this.getAttribute('data-matricule');
-    let tr = this.parentNode.parentNode; // button td tr table
+    const matricule = this.getAttribute('data-matricule');
+    const tr = this.parentNode.parentNode; // button td tr table
     tr.parentNode.removeChild(tr);
-    let i = trolls[matricule].evenements.map(x => x.tr).indexOf(tr);
+    const i = trolls[matricule].evenements.map(x => x.tr).indexOf(tr);
     if (i > -1) { // devrait l'être
         trolls[matricule].evenements.splice(i, 1);
         changerNombreEvenements(matricule);
@@ -389,7 +421,8 @@ function changerNombreEvenements(matricule) {
 
 function colorier() {
     for (let matricule in trolls) {
-        for (let e of document.querySelectorAll("#" + ID_TROLL + matricule + ', ' + "." + CLASS_EVENEMENT + matricule)) {
+        for (let e of document.querySelector(SELECTEUR_ZONE_A_REMPLIR).querySelectorAll("#" + ID_TROLL + matricule + ', ' + "." + CLASS_EVENEMENT + matricule)) {
+            e.classList.remove('mh_tdpage'); //sinon prend le dessus sur la couleur
             e.style.backgroundColor = trolls[matricule].inputCouleur.value + "88";
         }
     }
@@ -398,9 +431,9 @@ function colorier() {
 /* ********** conversion dates ************ */
 
 function convertirDateMhVersJs(dateMh) {
-    let arrayDateHeure = dateMh.split(' ');
-    let arrayJourMoisAn = arrayDateHeure[0].split('/');
-    let dateJs =  new Date(`${arrayJourMoisAn[2]}-${arrayJourMoisAn[1]}-${arrayJourMoisAn[0]} ${arrayDateHeure[1]}`);
+    const arrayDateHeure = dateMh.split(' ');
+    const arrayJourMoisAn = arrayDateHeure[0].split('/');
+    const dateJs =  new Date(`${arrayJourMoisAn[2]}-${arrayJourMoisAn[1]}-${arrayJourMoisAn[0]} ${arrayDateHeure[1]}`);
     return dateJs;
 }
 
@@ -435,8 +468,116 @@ function reparerLiens() {
         else if (a.href.includes('/mountyhall/View/MonsterView?ai_IDPJ=') && (!(a.href.includes('https://games.mountyhall.com')))) { // troll
             a.target = "_blank";
             matricule = a.href.split("=")[1];
-           a.href = "https://games.mountyhall.com/mountyhall/View/MonsterView.php?ai_IDPJ=" + matricule;
+            a.href = "https://games.mountyhall.com/mountyhall/View/MonsterView.php?ai_IDPJ=" + matricule;
         }
     }
 }
 
+/* ********** Remplacer css ************ */
+// l'idée ic est de faire absolument tout via js
+// étant donné que tout n'est pas reconstruit, pas possible de l'injecter à la création
+
+const COULEUR_MONSTRE = 'red';
+const COULEUR_TROLL = 'blue';
+
+function mettreEnFormeStructure() {
+    regrouperChamps();
+    espacerParties(); // utile ?
+}
+
+function mettreCouleursEvenements() {
+    colorierMonstres();
+    colorierTrolls();
+}
+
+function colorierMonstres() {
+    for (let e of document.querySelectorAll('.mh_monstres')) {
+        e.style.color = COULEUR_MONSTRE;
+    }
+}
+
+function colorierTrolls() {
+    for (let e of document.querySelectorAll('.mh_trolls_1')) {
+        e.style.color = COULEUR_TROLL;
+    }
+}
+
+function regrouperChamps() {
+    for (let e of document.querySelectorAll('.ensemble')) {
+        e.style.whiteSpace = 'nowrap';
+    }
+}
+
+function espacerParties() {
+    for (let e of document.querySelectorAll('.partie')) {
+        e.style.margin = '2vmin';
+    }
+}
+
+/* *********** Remplacer html **************** */
+
+function ajouterStructure() {
+
+    const zone = document.querySelector(SELECTEUR_ZONE_A_REMPLIR);
+
+
+    zone.innerHTML = `<div id="interface" class="partie">
+  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</br>
+    Il faut être connecté à MH. Il faut utiliser Chrome en mode 
+      <a href="https://stackoverflow.com/questions/3102819/disable-same-origin-policy-in-chrome" target="_blank">--disable-web-security</a></strong></p></div>
+  <div>
+    <span class="ensemble">
+      <label for="nouveauTroll">Ajouter un troll (numéro) :</label>
+      <input id="nouveauTroll" type="number" min="0" max="999999" step="1" >
+      <button id="ajouterTroll">Ajouter</button>
+    </span>
+  </div>
+</div>
+
+<div id="trolls" class="partie">
+  <table>
+    <thead>
+    <tr>
+      <th>Matricule</th>
+      <th>Nom</th>
+      <th>Couleur</th>
+      <th>Màj</th>
+      <th>
+        <button id="boutonRafraichirTous">Tous(!)</button>
+      </th>
+      <th>Nombre</th>
+      <th>Combat</th>
+      <th>Cacher</th>
+      <th>
+        <button id="boutonSupprimerTous">Tous(!)</button>
+      </th>
+    </tr>
+    </thead>
+
+    <tbody id="listeTrolls">
+    </tbody>
+
+  </table>
+</div>
+
+<div id="evenements" class="partie">
+  <strong>Evenements des trolls</strong>
+  <div id="listeEvenements">
+  </div>
+</div>`;
+
+    /*
+    //la flemme de le faire en js . :D
+     const texteAvertissement = "Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.";
+     const actions  = document.createElement("div");
+    const intro  = document.createElement("div");
+    const avertissement = document.createElement("p");
+    avertissement.appendChild(document.createElement("strong").appendChild(document.createTextNode(texteAvertissement)));
+    intro.appenchild(avertissement);
+    actions.appenchild(intro);
+
+    const ajoutTroll  = document.createElement("div");
+    ajoutTroll.classList.add('ensemble');
+    ...
+    */
+}
