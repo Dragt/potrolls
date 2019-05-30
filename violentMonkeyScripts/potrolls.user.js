@@ -558,9 +558,7 @@ function ajouterStructure() {
 
 
     zone.innerHTML = `<div id="interface" class="partie">
-  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</br>
-    Il faut être connecté à MH. Il faut utiliser Chrome en mode 
-      <a href="https://stackoverflow.com/questions/3102819/disable-same-origin-policy-in-chrome" target="_blank">--disable-web-security</a></strong></p></div>
+  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</strong></p></div>
   <div>
     <span class="ensemble">
       <label for="nouveauTroll">Ajouter un troll (numéro) :</label>
