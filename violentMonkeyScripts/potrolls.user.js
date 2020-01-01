@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name potrollsV2
+// @name potrolls
 // @namespace Violentmonkey Scripts
 // @include */mountyhall/View/PJView_Events.php*
 // @include */mountyhall/MH_Play/Play_ev*
