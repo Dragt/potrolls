@@ -1,9 +1,26 @@
 // ==UserScript==
-// @name potrolls
+// @name potrollsV2
 // @namespace Violentmonkey Scripts
+// @include */mountyhall/View/PJView_Events.php*
 // @include */mountyhall/MH_Play/Play_ev*
 // @grant none
+// @version 1.2
 // ==/UserScript==
+
+
+
+// v1.2
+// ajout de potrolls dans les fenêtres d'événements, avec notamment recherche d'un troll par nom
+// corection petit bug de récupération du nom sur certains profils
+
+
+
+/* Pas nécessaire, déjà connu
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery.js
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery-ui-autocomplete.min.js
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery.tagsinput.js
+*/
+
 
 /* 
  * Play_evenement 
@@ -11,7 +28,28 @@
  * Play_ev_honte
  * */
 
-function ajouterPotrolls() {
+const FENETRE_EVENEMENTS = window.location.pathname === '/mountyhall/View/PJView_Events.php';
+
+function ajouterPotrollsFenetreEvenements() {
+  
+  // Il n'y a la recherche auto sur nom de troll que dans les fenêtres dévénements. MH refuse à partir d'ailleurs que ce qui est défini;
+  $("head").append ('<link href="https://games.mountyhall.com/mountyhall/JavaScripts/jquery/css/jquery-ui.autocomplete.css" rel="stylesheet" type="text/css">');
+  $("head").append ('<link href="https://games.mountyhall.com/mountyhall/JavaScripts/jquery/css/jquery.tagsinput.css" rel="stylesheet" type="text/css">');
+
+  let bouton = document.createElement("button");
+  bouton.addEventListener('click', afficherPotrollsFenetreEvenements);
+  bouton.innerText = "Potrolls";
+  document.querySelector('.mh_titre1').appendChild(bouton);
+}
+
+function afficherPotrollsFenetreEvenements() {
+  document.querySelector('body').innerHTML = '';
+  initialiserPage();
+}
+
+
+
+function ajouterPotrollsInterface() {
   let bouton = document.createElement("li");
   bouton.setAttribute('data-wrapperels', 'span');  
   bouton.setAttribute('data-iconshadow', 'true');  
@@ -21,18 +59,29 @@ function ajouterPotrolls() {
   lien.appendChild(document.createTextNode('Potrolls'));
   lien.setAttribute('target', '_blank');
   //lien.setAttribute('href', 'https://dragt.github.io/potrolls/');
-  lien.addEventListener('click', afficherPotrolls);
+  lien.addEventListener('click', afficherPotrollsInterface);
   bouton.appendChild(lien);
   document.querySelector('nav#menu-evt ul').appendChild(bouton);
 }
 
-function afficherPotrolls() {
+function afficherPotrollsInterface() {
   document.querySelector('.mh_tdtitre').innerHTML = '';
   document.querySelector('table.footable').innerHTML = ''
   initialiserPage();
 }
 
-ajouterPotrolls();
+
+let  SELECTEUR_ZONE_A_REMPLIR;
+
+if (FENETRE_EVENEMENTS) {
+  SELECTEUR_ZONE_A_REMPLIR = "body";
+  ajouterPotrollsFenetreEvenements();
+}
+else {  
+  SELECTEUR_ZONE_A_REMPLIR = '.mh_tdtitre';
+  ajouterPotrollsInterface();
+}
+
 
 "use strict";
 
@@ -56,7 +105,7 @@ const ID_CACHER = 'cacher-';
 const ID_SUPPRIMER = 'supprimer-';
 const ID_RAFRAICHIR = 'rafraichir-';
 
-const SELECTEUR_ZONE_A_REMPLIR = '.mh_tdtitre';
+
 
 
 let trolls = {};
@@ -384,7 +433,9 @@ function chargerEvenementsTroll(matricule) {
         //let evenementsTroll = [];
 
         // Afficher le nom du troll
-        trolls[matricule].nom = nodePageEvenements.querySelector('.mh_titre1').innerHTML;
+        let contenantDuNom = nodePageEvenements.querySelector('.mh_titre1');
+      
+        trolls[matricule].nom = contenantDuNom ? contenantDuNom.innerHTML : nodePageEvenements.querySelector('h1').innerHTML;
         document.getElementById(ID_NOM + matricule).innerHTML = trolls[matricule].nom;
 
         const trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr, table#events tbody tr'); // todo : trouver un truc sûr pour recupérer tr
@@ -556,18 +607,38 @@ function ajouterStructure() {
 
     const zone = document.querySelector(SELECTEUR_ZONE_A_REMPLIR);
 
+    let htmlInputMatricule = "";
+  
+  /* pas nécessaire, déjà connu
+   <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery.js"></script>
+  <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery-ui-autocomplete.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/mountyhall/JavaScripts/jquery/css/jquery-ui.autocomplete.css">
+  <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery.tagsinput.js"></script>
+  <link rel="stylesheet" type="text/css" href="/mountyhall/JavaScripts/jquery/css/jquery.tagsinput.css">
+  */
+  
+    if (window.jQuery) { 
+      htmlInputMatricule = `
+  <input type="text" name="ai_TrollId" id="nouveauTroll" value="${FENETRE_EVENEMENTS ? new URLSearchParams(window.location.search).get('ai_IDPJ') : ''}" class="ui-autocomplete-input" autocomplete="off">`;
 
-    zone.innerHTML = `<div id="interface" class="partie">
+    } else {
+      htmlInputMatricule = '<input id="nouveauTroll" type="number" min="0" max="999999" step="1" >';
+      
+    }
+  
+
+
+    zone.innerHTML = `${ FENETRE_EVENEMENTS ? '<br><div><button onclick="document.location.reload(true);"> &lt;&lt; Retourner aux événements du troll</button></div>' : ''}
+<div id="interface" class="partie">
   <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</strong></p></div>
   <div>
     <span class="ensemble">
       <label for="nouveauTroll">Ajouter un troll (numéro) :</label>
-      <input id="nouveauTroll" type="number" min="0" max="999999" step="1" >
+      ${htmlInputMatricule}
       <button id="ajouterTroll">Ajouter</button>
     </span>
   </div>
 </div>
-
 <div id="trolls" class="partie">
   <table>
     <thead>
@@ -587,17 +658,22 @@ function ajouterStructure() {
       </th>
     </tr>
     </thead>
-
     <tbody id="listeTrolls">
     </tbody>
-
   </table>
 </div>
-
 <div id="evenements" class="partie">
   <strong>Evenements des trolls</strong>
   <div id="listeEvenements">
   </div>
 </div>`;
+  
+  
+   if (window.jQuery) {
+     //console.log("y a JQuery");
+    $("#nouveauTroll").autocomplete({source: '/mountyhall/MH_PageUtils/Services/json_trolls.php', minLength: 2});
+  } else {
+      //console.log("y a pas");
+  }
 
 }
