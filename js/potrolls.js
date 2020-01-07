@@ -12,11 +12,11 @@
 // enregistre localement les événements pour ne pas devoir tout recharger
 // 
 
-
 // v1.2
 // ajout de potrolls dans les fenêtres d'événements, avec notamment recherche d'un troll par nom
 // corection petit bug de récupération du nom sur certains profils
 
+// attention, pas forcément parfait : de petites errurs non visibles peuvent parfois survenir avec certains profils
 
 
 /* Pas nécessaire, déjà connu
@@ -43,7 +43,10 @@ function ajouterPotrollsFenetreEvenements() {
   let bouton = document.createElement("button");
   bouton.addEventListener('click', afficherPotrollsFenetreEvenements);
   bouton.innerText = "Potrolls";
-  document.querySelector('.mh_titre1').appendChild(bouton);
+  
+  // TODO : probleme en fonction des versions des css de profils, analyser et faire mieux
+  if (document.querySelector('.mh_titre1')) document.querySelector('.mh_titre1').appendChild(bouton);
+  else  document.querySelector('h1').appendChild(bouton);
 }
 
 function afficherPotrollsFenetreEvenements() {
