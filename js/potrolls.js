@@ -1,3 +1,92 @@
+// ==UserScript==
+// @name potrolls
+// @namespace Violentmonkey Scripts
+// @include */mountyhall/View/PJView_Events.php*
+// @include */mountyhall/MH_Play/Play_ev*
+// @grant none
+// @version 1.3
+// ==/UserScript==
+
+
+// v1.3
+// enregistre localement les événements pour ne pas devoir tout recharger
+// 
+
+
+// v1.2
+// ajout de potrolls dans les fenêtres d'événements, avec notamment recherche d'un troll par nom
+// corection petit bug de récupération du nom sur certains profils
+
+
+
+/* Pas nécessaire, déjà connu
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery.js
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery-ui-autocomplete.min.js
+// @require     https://games.mountyhall.com/mountyhall/JavaScripts/jquery/js/jquery.tagsinput.js
+*/
+
+
+/* 
+ * Play_evenement 
+ * Play_ev_chasse
+ * Play_ev_honte
+ * */
+
+const FENETRE_EVENEMENTS = window.location.pathname === '/mountyhall/View/PJView_Events.php';
+
+function ajouterPotrollsFenetreEvenements() {
+  
+  // Il n'y a la recherche auto sur nom de troll que dans les fenêtres dévénements. MH refuse à partir d'ailleurs que ce qui est défini;
+  $("head").append ('<link href="https://games.mountyhall.com/mountyhall/JavaScripts/jquery/css/jquery-ui.autocomplete.css" rel="stylesheet" type="text/css">');
+  $("head").append ('<link href="https://games.mountyhall.com/mountyhall/JavaScripts/jquery/css/jquery.tagsinput.css" rel="stylesheet" type="text/css">');
+
+  let bouton = document.createElement("button");
+  bouton.addEventListener('click', afficherPotrollsFenetreEvenements);
+  bouton.innerText = "Potrolls";
+  document.querySelector('.mh_titre1').appendChild(bouton);
+}
+
+function afficherPotrollsFenetreEvenements() {
+  document.querySelector('body').innerHTML = '';
+  initialiserPage();
+}
+
+
+
+function ajouterPotrollsInterface() {
+  let bouton = document.createElement("li");
+  bouton.setAttribute('data-wrapperels', 'span');  
+  bouton.setAttribute('data-iconshadow', 'true');  
+  bouton.setAttribute('data-shadow', 'true');  
+  bouton.setAttribute('data-corners', 'true');
+  let lien = document.createElement("a");
+  lien.appendChild(document.createTextNode('Potrolls'));
+  lien.setAttribute('target', '_blank');
+  //lien.setAttribute('href', 'https://dragt.github.io/potrolls/');
+  lien.addEventListener('click', afficherPotrollsInterface);
+  bouton.appendChild(lien);
+  document.querySelector('nav#menu-evt ul').appendChild(bouton);
+}
+
+function afficherPotrollsInterface() {
+  document.querySelector('.mh_tdtitre').innerHTML = '';
+  document.querySelector('table.footable').innerHTML = ''
+  initialiserPage();
+}
+
+
+let  SELECTEUR_ZONE_A_REMPLIR;
+
+if (FENETRE_EVENEMENTS) {
+  SELECTEUR_ZONE_A_REMPLIR = "body";
+  ajouterPotrollsFenetreEvenements();
+}
+else {  
+  SELECTEUR_ZONE_A_REMPLIR = '.mh_tdtitre';
+  ajouterPotrollsInterface();
+}
+
+
 "use strict";
 
 /* ********** globales et constantes ************ */
@@ -20,8 +109,7 @@ const ID_CACHER = 'cacher-';
 const ID_SUPPRIMER = 'supprimer-';
 const ID_RAFRAICHIR = 'rafraichir-';
 
-const SELECTEUR_ZONE_A_REMPLIR = '.mh_tdtitre';
-//const SELECTEUR_ZONE_A_REMPLIR = '#zoneARemplir';
+
 
 
 let trolls = {};
@@ -48,7 +136,7 @@ let trollsSauvegardes = [];
 
 /* ********** initialisation ************ */
 
-document.addEventListener('DOMContentLoaded', initialiserPage);
+//document.addEventListener('DOMContentLoaded', initialiserPage);
 
 function initialiserPage() {
 
@@ -56,6 +144,8 @@ function initialiserPage() {
     mettreEnFormeStructure();
 
     recupererSauvegarde();
+  
+    recupererSauvegardeEvenements(); // v1.3
 
     document.getElementById('boutonRafraichirTous').addEventListener('click', rafraichirEvenementsDeTousLesTrolls);
     document.getElementById('boutonSupprimerTous').addEventListener('click', supprimerTousLesTrolls);
@@ -89,13 +179,78 @@ function mettreAJourSauvegarde() {
     for (let matricule in trolls) {
         let trollSauvegarde = {};
         trollSauvegarde.matricule = matricule;
-        trollSauvegarde.nom =trolls[matricule].nom;
+        trollSauvegarde.nom = trolls[matricule].nom;
         trollSauvegarde.couleur = trolls[matricule].couleur;
         trollsSauvegardes.push(trollSauvegarde);
     }
 
     window.localStorage.setItem('sauvegardePotrolls', JSON.stringify(trollsSauvegardes));
 }
+
+
+// ajouté après, pour ça que les noms des méthodes précédentes pas parfaits, et déroulements pas parfait, pas refactoré
+// choix volontaire de garder séparé les trolls/couleurs d'interface et les évènements. Faut que les deux restent cohérents. moyen d'améliorer
+
+ 
+function recupererSauvegardeEvenements() {
+  
+    if (window.localStorage.getItem('sauvegardePotrollsEvenements')) {
+        const sauvegardeEvenements = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenements'));
+        for (let matricule in sauvegardeEvenements) {
+          if (matricule in trolls) {
+            trolls[matricule].evenements = sauvegardeEvenements[matricule];
+            trolls[matricule].nombreEvenements = sauvegardeEvenements[matricule].length;
+            trolls[matricule].evenements.forEach(x => {
+              x.moment = new Date(x.moment); // enregistré en string, reconverti en date
+              let tempTr = document.createElement("tr");
+              tempTr.innerHTML = x.tr;
+              x.tr = tempTr; // converti de string code html vers element
+              x.tr.classList.add(CLASS_EVENEMENT + matricule);
+              x.tr.querySelector("button").addEventListener('click', supprimerEvenement); // y a mieux comme sélecteur ;)
+             trolls[matricule].heureMaj = sauvegardeEvenements[matricule].maj;
+            });
+          }
+        }
+      if (window.localStorage.getItem('sauvegardePotrollsEvenementsMaj')) {
+         const sauvegardeEvenementsMaj = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenementsMaj'));
+         for (let matricule in sauvegardeEvenementsMaj) {
+           if (matricule in trolls) {
+             if (sauvegardeEvenementsMaj[matricule]) {
+               trolls[matricule].heureMaj = sauvegardeEvenementsMaj[matricule];
+             }
+             else {
+               trolls[matricule].heureMaj = "";
+             }
+           }
+         }
+       }
+      
+      afficherTrolls(); // pour afficher nombre événements et heureMaj
+      afficherEvenements();
+    }
+}
+
+
+// TODO : placés sans trop de réflexion, à revoir, il y en a peut-être trop ou pas assez, rechercher : mettreAJourSauvegardeEvenements(); // v1.3
+function mettreAJourSauvegardeEvenements() {
+  
+  let sauvegardeEvenements = {};
+  let sauvegardeEvenementsMaj = {}; // par facilité rapidos...
+  
+  for (let matricule in trolls) {
+    sauvegardeEvenements[matricule] = JSON.parse(JSON.stringify(trolls[matricule].evenements)); // deepcopy
+    sauvegardeEvenements[matricule].forEach((x, i) => {x.tr = trolls[matricule].evenements[i].tr.innerHTML; });  // enregistre le code html du tr
+    
+    sauvegardeEvenementsMaj[matricule] = trolls[matricule].heureMaj;
+  }
+  window.localStorage.setItem('sauvegardePotrollsEvenements', JSON.stringify(sauvegardeEvenements));  
+  
+  window.localStorage.setItem('sauvegardePotrollsEvenementsMaj', JSON.stringify(sauvegardeEvenementsMaj));
+  
+  // mettreAJourSauvegarde(); 
+  
+}
+
 
 
 /* ************* partie liste trolls **************** */
@@ -118,6 +273,8 @@ function ajouterTroll() {
     // pour le moment on recrée tout le tableau et on le ré-affiche, bourrin mais simple et local
     afficherTrolls();
     chargerEvenementsTroll(matricule);
+  
+    mettreAJourSauvegardeEvenements(); // v1.3
 
     // mettreAJourSauvegarde(); // bien ici, plutôt mis apprès pour faire tout en une fois avec nom du troll connu
 }
@@ -230,6 +387,7 @@ function creerTrTroll(matricule) {
 function rafraichirTroll() {
     const matricule = this.id.replace(ID_RAFRAICHIR, '');
     chargerEvenementsTroll(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerCouleurTroll() {
@@ -244,6 +402,7 @@ function afficherSeulementCombatTroll() {
     trolls[matricule].combat = Number(trolls[matricule].checkBoxCombat.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function cacherEvenementsTroll() {
@@ -251,6 +410,7 @@ function cacherEvenementsTroll() {
     trolls[matricule].cacher = Number(trolls[matricule].checkBoxCacher.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTroll() {
@@ -259,6 +419,7 @@ function supprimerTroll() {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTousLesTrolls () {
@@ -268,6 +429,7 @@ function supprimerTousLesTrolls () {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 /* ************* partie affichage evenements **************** */
@@ -297,6 +459,7 @@ function afficherEvenements() {
     mettreCouleursEvenements();
 
     mettreAJourSauvegarde(); // un peu dommage fait à chaque fois ?
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function recupererTousEvenements() {
@@ -340,6 +503,7 @@ function chargerEvenementsTroll(matricule) {
     function ajouterEvenements(pageHtMLEvenements, matricule) {
         const evenementsTroll = convertirVersEvenements(pageHtMLEvenements, matricule)
         trolls[matricule].evenements = trolls[matricule].evenements.concat(evenementsTroll);
+        mettreAJourSauvegardeEvenements(); // v1.3
     }
 
     function convertirVersEvenements(pageHtMLEvenements, matricule) {
@@ -349,7 +513,9 @@ function chargerEvenementsTroll(matricule) {
         //let evenementsTroll = [];
 
         // Afficher le nom du troll
-        trolls[matricule].nom = nodePageEvenements.querySelector('.mh_titre1').innerHTML;
+        let contenantDuNom = nodePageEvenements.querySelector('.mh_titre1');
+      
+        trolls[matricule].nom = contenantDuNom ? contenantDuNom.innerHTML : nodePageEvenements.querySelector('h1').innerHTML;
         document.getElementById(ID_NOM + matricule).innerHTML = trolls[matricule].nom;
 
         const trEvenements = nodePageEvenements.querySelectorAll('table.footable tbody tr, table#events tbody tr'); // todo : trouver un truc sûr pour recupérer tr
@@ -382,6 +548,8 @@ function chargerEvenementsTroll(matricule) {
 
         return evenementsTroll;
     }
+  
+
 }
 
 function supprimerEvenement() {
@@ -393,15 +561,18 @@ function supprimerEvenement() {
         trolls[matricule].evenements.splice(i, 1);
         changerNombreEvenements(matricule);
     }
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerEvenements(matricule) {
     trolls[matricule].evenements = [];
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerHeureMaj(matricule, heure) {
     trolls[matricule].heureMaj = heure;
     trolls[matricule].tdHeureMaj.innerHTML = heure;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerNombreEvenements(matricule) {
@@ -417,12 +588,14 @@ function changerNombreEvenements(matricule) {
     }
     trolls[matricule].nombreEvenements = nombre;
     trolls[matricule].tdNombreEvenements.innerHTML = nombre;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function colorier() {
+  
     for (let matricule in trolls) {
         for (let e of document.querySelector(SELECTEUR_ZONE_A_REMPLIR).querySelectorAll("#" + ID_TROLL + matricule + ', ' + "." + CLASS_EVENEMENT + matricule)) {
-            e.classList.remove('mh_tdpage'); //sinon prend le dessus sur la couleur
+            e.classList.remove('mh_tdpage');
             e.style.backgroundColor = trolls[matricule].inputCouleur.value + "88";
         }
     }
@@ -474,7 +647,7 @@ function reparerLiens() {
 }
 
 /* ********** Remplacer css ************ */
-// l'idée ic est de faire absolument tout via js
+// l'idée ici est de faire absolument tout via js
 // étant donné que tout n'est pas reconstruit, pas possible de l'injecter à la création
 
 const COULEUR_MONSTRE = 'red';
@@ -520,20 +693,38 @@ function ajouterStructure() {
 
     const zone = document.querySelector(SELECTEUR_ZONE_A_REMPLIR);
 
+    let htmlInputMatricule = "";
+  
+  /* pas nécessaire, déjà connu
+   <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery.js"></script>
+  <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery-ui-autocomplete.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/mountyhall/JavaScripts/jquery/css/jquery-ui.autocomplete.css">
+  <script type="text/javascript" src="/mountyhall/JavaScripts/jquery/js/jquery.tagsinput.js"></script>
+  <link rel="stylesheet" type="text/css" href="/mountyhall/JavaScripts/jquery/css/jquery.tagsinput.css">
+  */
+  
+    if (window.jQuery) { 
+      htmlInputMatricule = `
+  <input type="text" name="ai_TrollId" id="nouveauTroll" value="${FENETRE_EVENEMENTS ? new URLSearchParams(window.location.search).get('ai_IDPJ') : ''}" class="ui-autocomplete-input" autocomplete="off">`;
 
-    zone.innerHTML = `<div id="interface" class="partie">
-  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</br>
-    Il faut être connecté à MH. Il faut utiliser Chrome en mode 
-      <a href="https://stackoverflow.com/questions/3102819/disable-same-origin-policy-in-chrome" target="_blank">--disable-web-security</a></strong></p></div>
+    } else {
+      htmlInputMatricule = '<input id="nouveauTroll" type="number" min="0" max="999999" step="1" >';
+      
+    }
+  
+
+
+    zone.innerHTML = `${ FENETRE_EVENEMENTS ? '<br><div><button onclick="document.location.reload(true);"> &lt;&lt; Retourner aux événements du troll</button></div>' : ''}
+<div id="interface" class="partie">
+  <div><p><strong>Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.</strong></p></div>
   <div>
     <span class="ensemble">
       <label for="nouveauTroll">Ajouter un troll (numéro) :</label>
-      <input id="nouveauTroll" type="number" min="0" max="999999" step="1" >
+      ${htmlInputMatricule}
       <button id="ajouterTroll">Ajouter</button>
     </span>
   </div>
 </div>
-
 <div id="trolls" class="partie">
   <table>
     <thead>
@@ -553,31 +744,22 @@ function ajouterStructure() {
       </th>
     </tr>
     </thead>
-
     <tbody id="listeTrolls">
     </tbody>
-
   </table>
 </div>
-
 <div id="evenements" class="partie">
   <strong>Evenements des trolls</strong>
   <div id="listeEvenements">
   </div>
 </div>`;
+  
+  
+   if (window.jQuery) {
+     //console.log("y a JQuery");
+    $("#nouveauTroll").autocomplete({source: '/mountyhall/MH_PageUtils/Services/json_trolls.php', minLength: 2});
+  } else {
+      //console.log("y a pas");
+  }
 
-    /*
-    //la flemme de le faire en js . :D
-     const texteAvertissement = "Chaque rafraichissement fait appel au serveur. Merci d'utiliser l'outil de manière responsable.";
-     const actions  = document.createElement("div");
-    const intro  = document.createElement("div");
-    const avertissement = document.createElement("p");
-    avertissement.appendChild(document.createElement("strong").appendChild(document.createTextNode(texteAvertissement)));
-    intro.appenchild(avertissement);
-    actions.appenchild(intro);
-
-    const ajoutTroll  = document.createElement("div");
-    ajoutTroll.classList.add('ensemble');
-    ...
-    */
 }
