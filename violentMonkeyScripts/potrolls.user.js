@@ -1,18 +1,229 @@
 // ==UserScript==
-// @name potrolls
+// @name potrollssciz
 // @namespace Violentmonkey Scripts
 // @include */mountyhall/View/PJView_Events.php*
 // @include */mountyhall/MH_Play/Play_ev*
 // @grant none
-// @version 1.2
+// @version vS.1
 // ==/UserScript==
 
+// vS.1
+// bidouillé pour fonctionné avec les événéments sciz
+
+// v1.3
+// enregistre localement les événements pour ne pas devoir tout recharger
+// 
 
 
 // v1.2
 // ajout de potrolls dans les fenêtres d'événements, avec notamment recherche d'un troll par nom
 // corection petit bug de récupération du nom sur certains profils
 
+
+
+/*** MZ *** */
+
+
+function FF_XMLHttpRequest(MY_XHR_Ob) {
+	var request = new XMLHttpRequest();
+	request.open(MY_XHR_Ob.method,MY_XHR_Ob.url);
+	for(var head in MY_XHR_Ob.headers) {
+		request.setRequestHeader(head,MY_XHR_Ob.headers[head]);
+	}
+	request.onreadystatechange = function() {
+		//window.console.log('XMLHttp readystatechange url=' + MY_XHR_Ob.url + ', readyState=' + request.readyState + ', error=' + request.error + ', status=' + request.status);
+		if(request.readyState!=4) { return; }
+		if(request.error) {
+			if(MY_XHR_Ob.onerror) {
+				MY_XHR_Ob.onerror(request);
+			}
+			return;
+		}
+		if ((request.status == 0)) {
+			window.console.log('status=0 au retour de ' + MY_XHR_Ob.url + ', réponse=' + request.responseText);
+			if (isDEV) {
+				var grandCadre = createOrGetGrandCadre();
+				var sousCadre = document.createElement('div');
+				sousCadre.innerHTML = 'AJAX status = 0, voir console';
+				sousCadre.style.width = 'auto';
+				sousCadre.style.fontSize = 'large';
+				sousCadre.style.border = 'solid 1px black';
+				grandCadre.appendChild(sousCadre);
+			}
+			//showHttpsErrorContenuMixte();
+			return;
+		}
+		if(MY_XHR_Ob.onload) {
+			var version;
+			
+			/* DEBUG: Ajouter à request les pptés de MY_XHR_Ob à transmettre */
+			MY_XHR_Ob.onload(request);   // MODIF
+		}
+	};
+	request.send(MY_XHR_Ob.data);
+}
+
+/***
+ *** SCIZ
+ ***/
+
+function StringToDate(str) {
+	return str.replace(/([0-9]+)\/([0-9]+)/,"$2/$1");
+	}
+
+var scizGlobal = {
+    events: []
+};
+
+function scizPrettyPrintEvent(e) {
+	e.message = e.message.replace(/^[0-9]{2}\/[0-9]{2}\/[0-9]{4}\s[0-9]{2}h[0-9]{2}:[0-9]{2}(\sMORT\s\-)?/g, ''); // Delete date and death flag
+	e.message = e.message.replace(/\n\s*\n*/g, '<br/>');
+	const beings = [[e.att_id, e.att_nom], [e.def_id, e.def_nom], [e.mob_id, e.mob_nom], [e.owner_id, e.owner_nom], [e.troll_id, e.troll_nom]];
+	beings.forEach(b => {
+		if (b[0] && b[1]) {
+			b[1] = b[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			if (b[0].toString().length > 6) {
+				// Mob
+				b[1] = b[1].replace(/^une?\s/g, '');
+				e.message = e.message.replace(new RegExp('(' + b[1] + ')','gi'), '<b><a href="/mountyhall/View/MonsterView.php?ai_IDPJ=' + b[0] + '" rel="modal:open" class="mh_monstres">\$1</a></b>');
+			} else {
+				// Troll
+				e.message = e.message.replace(new RegExp('(' + b[1] + ')','gi'), '<b><a href="javascript:EPV(\'' + b[0] + '\')" class="mh_trolls_1">\$1</a></b>');
+			}
+		}
+	});
+	return e;
+}
+
+function do_scizOverwriteEvents(id) {
+	scizGlobal.events = [];
+	var eventTableNode = null;
+
+	// Ensure we have a JWT setup for the current user
+	//jwt = MY_getValue('44204' + '.SCIZJWT');
+  
+  jwt = document.getElementById("scizjwt").value;   // MODIF
+	if (!jwt) { return; }
+
+	// Retrieve being ID
+	const url = new URL(window.location.href);
+	//var id = url.searchParams.get('ai_IDPJ');
+	//id = (!id) ? numTroll : id;
+
+	const xPathQuery = "//*/div[@id='listeEvenements']/table/tr";  //MODIF
+
+	// Retrieve local events
+	var xPathEvents = document.evaluate(xPathQuery, document, null, 0, null);
+	while (xPathEvent = xPathEvents.iterateNext()) {
+		scizGlobal.events.push({
+			'time': Date.parse(StringToDate(xPathEvent.children[1].innerHTML)),  // MODIF
+			'type': xPathEvent.children[2].innerHTML,     
+			'desc': xPathEvent.children[3].innerHTML,
+			'sciz_desc': null,
+			'node': xPathEvent,
+		});
+		if (eventTableNode === null) {
+			eventTableNode = xPathEvent.parentNode; // MODIF
+		}
+	}
+	const interval = 5000; // Maximum interval (seconds) for matching some events
+	const startTime = Math.min.apply(Math, scizGlobal.events.map(function(e) { return e.time; })) - interval;
+	const endTime = Math.max.apply(Math, scizGlobal.events.map(function(e) { return e.time; })) + interval;
+
+	// Check if events have been found in the page
+	if (scizGlobal.events.length < 1) {
+		window.console.log('ERREUR - MZ/SCIZ - Aucun événement trouvé sur la page...');
+		return;
+	}
+
+  
+	// Call SCIZ
+    var sciz_url = 'https://www.sciz.fr/api/hook/events/' + id + '/' + startTime + '/' + endTime;
+    const eventType = url.searchParams.get('as_EventType'); // Retrieve event type filter
+    sciz_url += (eventType !== null && eventType !== '') ? '/' + eventType.split(' ')[0] : '' // Only the first word used for filtering ("MORT par monstre" => "MORT");
+
+    FF_XMLHttpRequest({
+      method: 'GET',
+      url: sciz_url,
+      headers : { 'Authorization': jwt },
+      // trace: 'Appel à SCIZ pour l'entité ' + id,
+      onload: function(responseDetails) {
+        try {
+          if (responseDetails.status == 0) {
+            window.console.log('ERREUR - MZ/SCIZ - Appel à SCIZ en échec...');
+            window.console.log(responseDetails);
+            return;
+          }
+          var events = JSON.parse(responseDetails.responseText);
+          if (events.events.length < 1) {
+            // window.console.log('DEBUG - MZ/SCIZ - Aucun événement trouvé dans la base SCIZ...');
+            return;
+          }
+          // Look for events to overwrite (based on timestamps)
+          events.events.forEach(e => {
+            if (e.message.includes(id)) { // Exclude any event we were not looking for...
+              const t = Date.parse(StringToDate(e.time));
+              // Look for the best event matching and not already replaced
+              var i = -1;
+              var lastDelta = Infinity;
+              for (j = 0; j < scizGlobal.events.length; j++) {
+                if (scizGlobal.events[j].sciz_desc === null) {
+                  var delta = Math.abs(t - scizGlobal.events[j].time);
+                  if (delta <= interval && delta < lastDelta) {
+                    lastDelta = delta;
+                    i = j;
+                  }
+                }
+              }
+              if (i > -1) {
+                // PrettyPrint
+                e = scizPrettyPrintEvent(e);
+                // Store the SCIZ event
+                scizGlobal.events[i].sciz_desc = e.message;
+                // Actual display overwrite
+                scizGlobal.events[i].node.children[3].innerHTML = scizGlobal.events[i].sciz_desc; //MODIF
+              }
+            }
+          });
+          // Add the switch button
+          if (eventTableNode !== null) {
+            var img = document.createElement('img');
+            img.src = 'https://www.sciz.fr/static/104126/sciz-logo-quarter.png';
+            img.alt = 'SCIZ logo';
+            img.style = 'height: 50px; cursor: pointer;';
+            img.onclick = do_scizSwitchEvents;
+            var div = document.createElement('div');
+            div.style = 'text-align: center;';
+            div.appendChild(img);
+            //eventTableNode.parentNode.insertBefore(div, eventTableNode.nextSibling); MODIF
+            //document.getElementById('scizswitchbutton').appendChild(div); //MODIF  
+          }
+        } catch(e) {
+          window.console.log('ERREUR - MZ/SCIZ - Stacktrace');
+          window.console.log(e);
+        }
+        
+        mettreAJourSauvegardeEvenements(); // MODIF
+      }
+    });
+  
+  // D'abourd boucle envisagée, mais maintenant plutôt matricule envoyé en paramètre... mais alors plus d'accès DOM.
+  //// for (const id in trolls ) {
+  //}
+  
+}
+
+function do_scizSwitchEvents() {
+	scizGlobal.events.forEach((e) => {  //  Faudrait enregistrer tous les textes sciz dans la table et switcher. Ici seulement évènements d'un troll a la fois.
+		const currentDesc = e.node.children[2].innerHTML;
+		e.node.children[3].innerHTML = (currentDesc === e.desc) ? ((e.sciz_desc !== null) ? e.sciz_desc : e.desc) : e.desc;  //MODIF
+	});
+}
+
+
+
+
+/****** FIN SCIZ ***** */
 
 
 /* Pas nécessaire, déjà connu
@@ -39,7 +250,10 @@ function ajouterPotrollsFenetreEvenements() {
   let bouton = document.createElement("button");
   bouton.addEventListener('click', afficherPotrollsFenetreEvenements);
   bouton.innerText = "Potrolls";
-  document.querySelector('.mh_titre1').appendChild(bouton);
+  
+  // TODO : probleme en fonction des versions des css de profils, analyser et faire mieux
+  if (document.querySelector('.mh_titre1')) document.querySelector('.mh_titre1').appendChild(bouton);
+  else  document.querySelector('h1').appendChild(bouton);
 }
 
 function afficherPotrollsFenetreEvenements() {
@@ -140,12 +354,29 @@ function initialiserPage() {
     mettreEnFormeStructure();
 
     recupererSauvegarde();
+  
+    recupererSauvegardeEvenements(); // v1.3
 
     document.getElementById('boutonRafraichirTous').addEventListener('click', rafraichirEvenementsDeTousLesTrolls);
     document.getElementById('boutonSupprimerTous').addEventListener('click', supprimerTousLesTrolls);
     document.getElementById('ajouterTroll').addEventListener('click', ajouterTroll);
+  
+   // JWT
+  chargerScizJwt(); 
+  document.getElementById('enregistrerscizjwt').addEventListener('click', sauvegarderScizjwt);
 }
 
+
+/* ********** sauvegarde JWT ************ */
+
+function chargerScizJwt() {
+  const jwt = window.localStorage.getItem('scizjwt');
+  if (jwt) document.getElementById("scizjwt").value = jwt;
+}
+
+function sauvegarderScizjwt() {
+  window.localStorage.setItem('scizjwt', document.getElementById("scizjwt").value);
+}
 
 /* ********** sauvegarde trolls ************ */
 
@@ -167,19 +398,86 @@ function recupererSauvegarde() {
     }
 }
 
+
+
 function mettreAJourSauvegarde() {
     trollsSauvegardes = [];
 
     for (let matricule in trolls) {
         let trollSauvegarde = {};
         trollSauvegarde.matricule = matricule;
-        trollSauvegarde.nom =trolls[matricule].nom;
+        trollSauvegarde.nom = trolls[matricule].nom;
         trollSauvegarde.couleur = trolls[matricule].couleur;
         trollsSauvegardes.push(trollSauvegarde);
     }
 
     window.localStorage.setItem('sauvegardePotrolls', JSON.stringify(trollsSauvegardes));
 }
+
+
+// ajouté après, pour ça que les noms des méthodes précédentes pas parfaits, et déroulements pas parfait, pas refactoré
+// choix volontaire de garder séparé les trolls/couleurs d'interface et les évènements. Faut que les deux restent cohérents. moyen d'améliorer
+
+ 
+function recupererSauvegardeEvenements() {
+  
+    if (window.localStorage.getItem('sauvegardePotrollsEvenements')) {
+        const sauvegardeEvenements = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenements'));
+        for (let matricule in sauvegardeEvenements) {
+          if (matricule in trolls) {
+            trolls[matricule].evenements = sauvegardeEvenements[matricule];
+            trolls[matricule].nombreEvenements = sauvegardeEvenements[matricule].length;
+            trolls[matricule].evenements.forEach(x => {
+              x.moment = new Date(x.moment); // enregistré en string, reconverti en date
+              let tempTr = document.createElement("tr");
+              tempTr.innerHTML = x.tr;
+              x.tr = tempTr; // converti de string code html vers element
+              x.tr.classList.add(CLASS_EVENEMENT + matricule);
+              x.tr.querySelector("button").addEventListener('click', supprimerEvenement); // y a mieux comme sélecteur ;)
+             trolls[matricule].heureMaj = sauvegardeEvenements[matricule].maj;
+            });
+          }
+        }
+      if (window.localStorage.getItem('sauvegardePotrollsEvenementsMaj')) {
+         const sauvegardeEvenementsMaj = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenementsMaj'));
+         for (let matricule in sauvegardeEvenementsMaj) {
+           if (matricule in trolls) {
+             if (sauvegardeEvenementsMaj[matricule]) {
+               trolls[matricule].heureMaj = sauvegardeEvenementsMaj[matricule];
+             }
+             else {
+               trolls[matricule].heureMaj = "";
+             }
+           }
+         }
+       }
+      
+      afficherTrolls(); // pour afficher nombre événements et heureMaj
+      afficherEvenements();
+    }
+}
+
+
+// TODO : placés sans trop de réflexion, à revoir, il y en a peut-être trop ou pas assez, rechercher : mettreAJourSauvegardeEvenements(); // v1.3
+function mettreAJourSauvegardeEvenements() {
+  
+  let sauvegardeEvenements = {};
+  let sauvegardeEvenementsMaj = {}; // par facilité rapidos...
+  
+  for (let matricule in trolls) {
+    sauvegardeEvenements[matricule] = JSON.parse(JSON.stringify(trolls[matricule].evenements)); // deepcopy
+    sauvegardeEvenements[matricule].forEach((x, i) => {x.tr = trolls[matricule].evenements[i].tr.innerHTML; });  // enregistre le code html du tr
+    
+    sauvegardeEvenementsMaj[matricule] = trolls[matricule].heureMaj;
+  }
+  window.localStorage.setItem('sauvegardePotrollsEvenements', JSON.stringify(sauvegardeEvenements));       /// TOTO Erreur JSON lors d'ajout d'un nouveau... + appelé un peu trop cette mise à jour ?
+  
+  window.localStorage.setItem('sauvegardePotrollsEvenementsMaj', JSON.stringify(sauvegardeEvenementsMaj));
+  
+  // mettreAJourSauvegarde(); 
+  
+}
+
 
 
 /* ************* partie liste trolls **************** */
@@ -202,6 +500,8 @@ function ajouterTroll() {
     // pour le moment on recrée tout le tableau et on le ré-affiche, bourrin mais simple et local
     afficherTrolls();
     chargerEvenementsTroll(matricule);
+  
+    mettreAJourSauvegardeEvenements(); // v1.3
 
     // mettreAJourSauvegarde(); // bien ici, plutôt mis apprès pour faire tout en une fois avec nom du troll connu
 }
@@ -314,6 +614,7 @@ function creerTrTroll(matricule) {
 function rafraichirTroll() {
     const matricule = this.id.replace(ID_RAFRAICHIR, '');
     chargerEvenementsTroll(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerCouleurTroll() {
@@ -328,6 +629,7 @@ function afficherSeulementCombatTroll() {
     trolls[matricule].combat = Number(trolls[matricule].checkBoxCombat.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function cacherEvenementsTroll() {
@@ -335,6 +637,7 @@ function cacherEvenementsTroll() {
     trolls[matricule].cacher = Number(trolls[matricule].checkBoxCacher.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTroll() {
@@ -343,6 +646,7 @@ function supprimerTroll() {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTousLesTrolls () {
@@ -352,6 +656,7 @@ function supprimerTousLesTrolls () {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 /* ************* partie affichage evenements **************** */
@@ -381,6 +686,7 @@ function afficherEvenements() {
     mettreCouleursEvenements();
 
     mettreAJourSauvegarde(); // un peu dommage fait à chaque fois ?
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function recupererTousEvenements() {
@@ -419,11 +725,18 @@ function chargerEvenementsTroll(matricule) {
         afficherEvenements();
         changerHeureMaj(matricule, heureRetour.toLocaleTimeString());
         changerNombreEvenements(matricule);
+      
+      
+      // SCIZ
+      if (document.getElementById('scizjwt').value) {
+        do_scizOverwriteEvents(matricule);        
+      }
     }
 
     function ajouterEvenements(pageHtMLEvenements, matricule) {
         const evenementsTroll = convertirVersEvenements(pageHtMLEvenements, matricule)
         trolls[matricule].evenements = trolls[matricule].evenements.concat(evenementsTroll);
+        mettreAJourSauvegardeEvenements(); // v1.3
     }
 
     function convertirVersEvenements(pageHtMLEvenements, matricule) {
@@ -468,6 +781,8 @@ function chargerEvenementsTroll(matricule) {
 
         return evenementsTroll;
     }
+  
+
 }
 
 function supprimerEvenement() {
@@ -479,15 +794,18 @@ function supprimerEvenement() {
         trolls[matricule].evenements.splice(i, 1);
         changerNombreEvenements(matricule);
     }
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerEvenements(matricule) {
     trolls[matricule].evenements = [];
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerHeureMaj(matricule, heure) {
     trolls[matricule].heureMaj = heure;
     trolls[matricule].tdHeureMaj.innerHTML = heure;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerNombreEvenements(matricule) {
@@ -503,6 +821,7 @@ function changerNombreEvenements(matricule) {
     }
     trolls[matricule].nombreEvenements = nombre;
     trolls[matricule].tdNombreEvenements.innerHTML = nombre;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function colorier() {
@@ -561,7 +880,7 @@ function reparerLiens() {
 }
 
 /* ********** Remplacer css ************ */
-// l'idée ic est de faire absolument tout via js
+// l'idée ici est de faire absolument tout via js
 // étant donné que tout n'est pas reconstruit, pas possible de l'injecter à la création
 
 const COULEUR_MONSTRE = 'red';
@@ -636,6 +955,11 @@ function ajouterStructure() {
       <label for="nouveauTroll">Ajouter un troll (numéro) :</label>
       ${htmlInputMatricule}
       <button id="ajouterTroll">Ajouter</button>
+    </span>
+    <span> - </span> 
+    <span class="ensemble">
+      <label for="scizjwt">SCIZ JWT (optionnel):</label>
+      <input id="scizjwt" type="text" > <button id="enregistrerscizjwt">Enregistrer</button><span id="scizswitchbutton"></span>
     </span>
   </div>
 </div>
