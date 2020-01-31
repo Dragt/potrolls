@@ -4,15 +4,19 @@
 // @include */mountyhall/View/PJView_Events.php*
 // @include */mountyhall/MH_Play/Play_ev*
 // @grant none
-// @version 1.2
+// @version 1.3
 // ==/UserScript==
 
 
+// v1.3
+// enregistre localement les événements pour ne pas devoir tout recharger
+// 
 
 // v1.2
 // ajout de potrolls dans les fenêtres d'événements, avec notamment recherche d'un troll par nom
 // corection petit bug de récupération du nom sur certains profils
 
+// attention, pas forcément parfait : de petites errurs non visibles peuvent parfois survenir avec certains profils
 
 
 /* Pas nécessaire, déjà connu
@@ -39,7 +43,10 @@ function ajouterPotrollsFenetreEvenements() {
   let bouton = document.createElement("button");
   bouton.addEventListener('click', afficherPotrollsFenetreEvenements);
   bouton.innerText = "Potrolls";
-  document.querySelector('.mh_titre1').appendChild(bouton);
+  
+  // TODO : probleme en fonction des versions des css de profils, analyser et faire mieux
+  if (document.querySelector('.mh_titre1')) document.querySelector('.mh_titre1').appendChild(bouton);
+  else  document.querySelector('h1').appendChild(bouton);
 }
 
 function afficherPotrollsFenetreEvenements() {
@@ -140,6 +147,8 @@ function initialiserPage() {
     mettreEnFormeStructure();
 
     recupererSauvegarde();
+  
+    recupererSauvegardeEvenements(); // v1.3
 
     document.getElementById('boutonRafraichirTous').addEventListener('click', rafraichirEvenementsDeTousLesTrolls);
     document.getElementById('boutonSupprimerTous').addEventListener('click', supprimerTousLesTrolls);
@@ -173,13 +182,78 @@ function mettreAJourSauvegarde() {
     for (let matricule in trolls) {
         let trollSauvegarde = {};
         trollSauvegarde.matricule = matricule;
-        trollSauvegarde.nom =trolls[matricule].nom;
+        trollSauvegarde.nom = trolls[matricule].nom;
         trollSauvegarde.couleur = trolls[matricule].couleur;
         trollsSauvegardes.push(trollSauvegarde);
     }
 
     window.localStorage.setItem('sauvegardePotrolls', JSON.stringify(trollsSauvegardes));
 }
+
+
+// ajouté après, pour ça que les noms des méthodes précédentes pas parfaits, et déroulements pas parfait, pas refactoré
+// choix volontaire de garder séparé les trolls/couleurs d'interface et les évènements. Faut que les deux restent cohérents. moyen d'améliorer
+
+ 
+function recupererSauvegardeEvenements() {
+  
+    if (window.localStorage.getItem('sauvegardePotrollsEvenements')) {
+        const sauvegardeEvenements = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenements'));
+        for (let matricule in sauvegardeEvenements) {
+          if (matricule in trolls) {
+            trolls[matricule].evenements = sauvegardeEvenements[matricule];
+            trolls[matricule].nombreEvenements = sauvegardeEvenements[matricule].length;
+            trolls[matricule].evenements.forEach(x => {
+              x.moment = new Date(x.moment); // enregistré en string, reconverti en date
+              let tempTr = document.createElement("tr");
+              tempTr.innerHTML = x.tr;
+              x.tr = tempTr; // converti de string code html vers element
+              x.tr.classList.add(CLASS_EVENEMENT + matricule);
+              x.tr.querySelector("button").addEventListener('click', supprimerEvenement); // y a mieux comme sélecteur ;)
+             trolls[matricule].heureMaj = sauvegardeEvenements[matricule].maj;
+            });
+          }
+        }
+      if (window.localStorage.getItem('sauvegardePotrollsEvenementsMaj')) {
+         const sauvegardeEvenementsMaj = JSON.parse(window.localStorage.getItem('sauvegardePotrollsEvenementsMaj'));
+         for (let matricule in sauvegardeEvenementsMaj) {
+           if (matricule in trolls) {
+             if (sauvegardeEvenementsMaj[matricule]) {
+               trolls[matricule].heureMaj = sauvegardeEvenementsMaj[matricule];
+             }
+             else {
+               trolls[matricule].heureMaj = "";
+             }
+           }
+         }
+       }
+      
+      afficherTrolls(); // pour afficher nombre événements et heureMaj
+      afficherEvenements();
+    }
+}
+
+
+// TODO : placés sans trop de réflexion, à revoir, il y en a peut-être trop ou pas assez, rechercher : mettreAJourSauvegardeEvenements(); // v1.3
+function mettreAJourSauvegardeEvenements() {
+  
+  let sauvegardeEvenements = {};
+  let sauvegardeEvenementsMaj = {}; // par facilité rapidos...
+  
+  for (let matricule in trolls) {
+    sauvegardeEvenements[matricule] = JSON.parse(JSON.stringify(trolls[matricule].evenements)); // deepcopy
+    sauvegardeEvenements[matricule].forEach((x, i) => {x.tr = trolls[matricule].evenements[i].tr.innerHTML; });  // enregistre le code html du tr
+    
+    sauvegardeEvenementsMaj[matricule] = trolls[matricule].heureMaj;
+  }
+  window.localStorage.setItem('sauvegardePotrollsEvenements', JSON.stringify(sauvegardeEvenements));  
+  
+  window.localStorage.setItem('sauvegardePotrollsEvenementsMaj', JSON.stringify(sauvegardeEvenementsMaj));
+  
+  // mettreAJourSauvegarde(); 
+  
+}
+
 
 
 /* ************* partie liste trolls **************** */
@@ -202,6 +276,8 @@ function ajouterTroll() {
     // pour le moment on recrée tout le tableau et on le ré-affiche, bourrin mais simple et local
     afficherTrolls();
     chargerEvenementsTroll(matricule);
+  
+    mettreAJourSauvegardeEvenements(); // v1.3
 
     // mettreAJourSauvegarde(); // bien ici, plutôt mis apprès pour faire tout en une fois avec nom du troll connu
 }
@@ -314,6 +390,7 @@ function creerTrTroll(matricule) {
 function rafraichirTroll() {
     const matricule = this.id.replace(ID_RAFRAICHIR, '');
     chargerEvenementsTroll(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerCouleurTroll() {
@@ -328,6 +405,7 @@ function afficherSeulementCombatTroll() {
     trolls[matricule].combat = Number(trolls[matricule].checkBoxCombat.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function cacherEvenementsTroll() {
@@ -335,6 +413,7 @@ function cacherEvenementsTroll() {
     trolls[matricule].cacher = Number(trolls[matricule].checkBoxCacher.checked);
     afficherEvenements();
     changerNombreEvenements(matricule);
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTroll() {
@@ -343,6 +422,7 @@ function supprimerTroll() {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerTousLesTrolls () {
@@ -352,6 +432,7 @@ function supprimerTousLesTrolls () {
     afficherTrolls();
     afficherEvenements();
     mettreAJourSauvegarde();
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 /* ************* partie affichage evenements **************** */
@@ -381,6 +462,7 @@ function afficherEvenements() {
     mettreCouleursEvenements();
 
     mettreAJourSauvegarde(); // un peu dommage fait à chaque fois ?
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function recupererTousEvenements() {
@@ -424,6 +506,7 @@ function chargerEvenementsTroll(matricule) {
     function ajouterEvenements(pageHtMLEvenements, matricule) {
         const evenementsTroll = convertirVersEvenements(pageHtMLEvenements, matricule)
         trolls[matricule].evenements = trolls[matricule].evenements.concat(evenementsTroll);
+        mettreAJourSauvegardeEvenements(); // v1.3
     }
 
     function convertirVersEvenements(pageHtMLEvenements, matricule) {
@@ -468,6 +551,8 @@ function chargerEvenementsTroll(matricule) {
 
         return evenementsTroll;
     }
+  
+
 }
 
 function supprimerEvenement() {
@@ -479,15 +564,18 @@ function supprimerEvenement() {
         trolls[matricule].evenements.splice(i, 1);
         changerNombreEvenements(matricule);
     }
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function supprimerEvenements(matricule) {
     trolls[matricule].evenements = [];
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerHeureMaj(matricule, heure) {
     trolls[matricule].heureMaj = heure;
     trolls[matricule].tdHeureMaj.innerHTML = heure;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function changerNombreEvenements(matricule) {
@@ -503,6 +591,7 @@ function changerNombreEvenements(matricule) {
     }
     trolls[matricule].nombreEvenements = nombre;
     trolls[matricule].tdNombreEvenements.innerHTML = nombre;
+    mettreAJourSauvegardeEvenements(); // v1.3
 }
 
 function colorier() {
@@ -561,7 +650,7 @@ function reparerLiens() {
 }
 
 /* ********** Remplacer css ************ */
-// l'idée ic est de faire absolument tout via js
+// l'idée ici est de faire absolument tout via js
 // étant donné que tout n'est pas reconstruit, pas possible de l'injecter à la création
 
 const COULEUR_MONSTRE = 'red';
